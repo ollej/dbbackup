@@ -73,13 +73,17 @@ class DbBackup {
         'error_not_writable' => "Can't write to backup directory, please change the directory permissions on directory: ",
         'error_not_dir' => "Path is a file, not a directory, please change the value: ",
         'error_no_filename' => "Must have a filename to dump database to.",
+        'seconds' => 'seconds',
+        'minutes' => 'minutes',
+        'hours' => 'hours',
+        'days' => 'days',
         'email_subject' => "Backup of database",
-        'email_body' => "Backup of {DBNAME}
+        'email_body' => "Backup of {DBNAME}:
 Time of backup: {BACKUPTIME}
-Backup took: {TIMESPENT} seconds
+Backup took: {TIMESPENT}
 Return code of dump command: {SUCCESS}
 Filename of backup: {FILENAME}
-Backup file size: {SIZE)",
+Backup file size: {SIZE}",
     );
     
     public function __construct($dbuser, $dbpass, $dbname, $password="",
@@ -178,12 +182,33 @@ Backup file size: {SIZE)",
         
         # Run mysqldump program to do the actual dump.
         $cmd = "mysqldump --user=$this->dbuser --password=$this->dbpass --host=$this->dbhost $this->dbname $compress > $this->filename";
-        $this->time_start = microtime(true);
+        $time_start = microtime(true);
         system($cmd, $result);
         $time_end = microtime(true);
-        $this->timespent = $time_end - $time_start;
+        $this->timespent = $this->formatTime($time_end - $time_start, 0);
         
         return $result;
+    }
+    
+    /**
+     * Utility function to convert time in seconds to human readable format.
+     * @param float $seconds Number of seconds to convert.
+     * @param int $precision Number of decimal points to round value to.
+     * @return String Readable time in seconds/minutes/hours/days
+     * @todo Should preferrably convert to: 1 day 5 hours 2 minutes 34 seconds
+     */
+    private function formatTime($seconds, $precision=2) {
+        $time = "";
+        if ($seconds < 60) {
+            $time = round($seconds, $precision) . ' ' . $this->lang['seconds'];
+        } else if ($seconds < 3600) {
+            $time = round($seconds / 60, $precision) . ' ' . $this->lang['minutes'];
+        } else if ($seconds < 86400) {
+            $time = round($size / 3600, $precision) . ' ' . $this->lang['hours'];
+        } else {
+            $time = round($size / 86400, $precision) . ' ' . $this->lang['days'];
+        }
+        return $time;
     }
     
     /**
