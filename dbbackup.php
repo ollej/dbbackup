@@ -52,6 +52,8 @@ class DbBackup {
     public $compress = 0;
     /** @var String $filenameformat How to name backup file, will be formatted with strftime and {DBNAME} will be replaced with $dbname */
     public $filenameformat = "{DBNAME}-%u.sql";
+    /** @var String $timezone Default timezone to set for strftime() function. */
+    public $timezone = 'Europe/Stockholm';
     /** @var String $filename Full path to the backup file. */
     private $filename = "";
     /** @var Boolean $authenticated Must be set to true to allow backup. */
@@ -73,10 +75,11 @@ class DbBackup {
         'error_not_writable' => "Can't write to backup directory, please change the directory permissions on directory: ",
         'error_not_dir' => "Path is a file, not a directory, please change the value: ",
         'error_no_filename' => "Must have a filename to dump database to.",
-        'seconds' => 'seconds',
-        'minutes' => 'minutes',
-        'hours' => 'hours',
-        'days' => 'days',
+        'seconds' => 'second(s)',
+        'minutes' => 'minute(s)',
+        'hours' => 'hour(s)',
+        'days' => 'day(s)',
+        'weeks' => 'week(s)',
         'email_subject' => "Backup of database",
         'email_body' => "Backup of {DBNAME}:
 Time of backup: {BACKUPTIME}
@@ -119,6 +122,7 @@ Backup file size: {SIZE}",
         if (is_file($this->path)) {
             throw new Exception($this->lang['error_not_dir'] + $this->path);    
         }
+        
     }
     
     /**
@@ -148,6 +152,9 @@ Backup file size: {SIZE}",
      * @return String Parsed filename.
      */
     private function parseFilename($filename) {
+        # Set default timezone.
+        ini_set('date.timezone', $this->timezone);
+
         $filename = strftime($filename);
         $filename = str_replace('{DBNAME}', $this->dbname, $filename);
         return $filename;
@@ -195,20 +202,34 @@ Backup file size: {SIZE}",
      * @param float $seconds Number of seconds to convert.
      * @param int $precision Number of decimal points to round value to.
      * @return String Readable time in seconds/minutes/hours/days
-     * @todo Should preferrably convert to: 1 day 5 hours 2 minutes 34 seconds
      */
     private function formatTime($seconds, $precision=2) {
         $time = "";
-        if ($seconds < 60) {
-            $time = round($seconds, $precision) . ' ' . $this->lang['seconds'];
-        } else if ($seconds < 3600) {
-            $time = round($seconds / 60, $precision) . ' ' . $this->lang['minutes'];
-        } else if ($seconds < 86400) {
-            $time = round($size / 3600, $precision) . ' ' . $this->lang['hours'];
-        } else {
-            $time = round($size / 86400, $precision) . ' ' . $this->lang['days'];
+        
+        $weeks = floor($seconds / 604800);
+        if ($weeks) {
+            $time .= $weeks . ' ' . $this->lang['weeks'] . ' ';
+            $seconds = $seconds % 604800;
         }
-        return $time;
+        $days = floor($seconds / 86400);
+        if ($days) {
+            $time .= $days . ' ' . $this->lang['days'] . ' ';
+            $seconds = $seconds % 86400;
+        }
+        $hours = floor($seconds / 3600);
+        if ($hours) {
+            $time .= $hours . ' ' . $this->lang['hours'] . ' ';
+            $seconds = $seconds % 3600;
+        }
+        $minutes = floor($seconds / 60);
+        if ($minutes) {
+            $time .= $minutes . ' ' . $this->lang['minutes'] . ' ';
+            $seconds = $seconds % 60;
+        }
+        if ($seconds) {
+            $time .= $seconds . ' ' . $this->lang['seconds'] . ' ';
+        }
+        return trim($time);
     }
     
     /**
@@ -266,3 +287,4 @@ Backup file size: {SIZE}",
 $backup = new DbBackup("dbuser", "dbpassword", "dbname", 'secret', "/server/path/to/backups", "localhost", "your_email_address@example.com");
 $backup->authenticate($_GET['pass']);
 $backup->backup();
+
